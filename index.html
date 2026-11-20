@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>アストラガロマンシー・古代骨占い</title>
+<script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gradient-to-br from-stone-900 to-zinc-800 min-h-screen text-white">
+<div class="max-w-2xl mx-auto p-4">
+  <div class="text-center mb-6">
+    <div class="text-5xl mb-2">🦴</div>
+    <h1 class="text-2xl font-bold text-stone-300">アストラガロマンシー</h1>
+    <p class="text-stone-400 text-sm mt-1">古代ギリシア・ローマの距骨（アストラガロス）サイコロ占術</p>
+    <p class="text-stone-500 text-xs mt-1">距骨は4面サイコロ: 1（凸面）/ 3（平面）/ 4（凹面）/ 6（狭面）</p>
+  </div>
+
+  <!-- 質問 -->
+  <div class="bg-stone-800 rounded-xl p-4 mb-5">
+    <label for="question" class="text-sm text-stone-300 font-semibold block mb-2">神託を求める問いを立ててください</label>
+    <input id="question" type="text" placeholder="例: この旅は安全でしょうか？"
+      aria-label="占いの質問"
+      class="w-full bg-stone-900 border border-stone-600 rounded-lg px-3 py-2 text-sm text-stone-100 placeholder-stone-600 focus:outline-none focus:ring-2 focus:ring-stone-400">
+    <button onclick="castBones()" aria-label="骨を投げる"
+      class="mt-3 w-full bg-stone-600 hover:bg-stone-500 text-white font-bold py-3 rounded-xl text-lg transition">
+      🦴 骨を投げる
+    </button>
+  </div>
+
+  <!-- 骨の表示 -->
+  <div id="bones-display" class="hidden bg-stone-800 rounded-xl p-5 mb-5">
+    <div class="flex justify-center gap-8 mb-4">
+      <div class="text-center">
+        <div class="text-xs text-stone-400 mb-1">骨1</div>
+        <div class="text-5xl" id="bone1-face"></div>
+        <div class="text-sm text-stone-300 mt-1" id="bone1-val"></div>
+      </div>
+      <div class="text-center">
+        <div class="text-xs text-stone-400 mb-1">骨2</div>
+        <div class="text-5xl" id="bone2-face"></div>
+        <div class="text-sm text-stone-300 mt-1" id="bone2-val"></div>
+      </div>
+    </div>
+    <div class="text-center text-stone-400 text-sm" id="combo-label"></div>
+  </div>
+
+  <!-- 神託 -->
+  <div id="oracle-display" class="hidden bg-stone-700 border border-stone-500 rounded-xl p-5 mb-5">
+    <div class="text-xs text-stone-400 uppercase tracking-wider mb-2">古代神託</div>
+    <div class="text-lg font-bold text-stone-200 mb-3" id="oracle-title"></div>
+    <div class="text-stone-100 leading-relaxed text-sm" id="oracle-text"></div>
+    <div class="mt-3 text-xs text-stone-400" id="oracle-deity"></div>
+  </div>
+
+  <!-- 組み合わせ表 -->
+  <details class="bg-stone-800 rounded-xl mb-5">
+    <summary class="p-4 cursor-pointer text-stone-300 text-sm font-semibold hover:text-white">全21通りの組み合わせ表を表示</summary>
+    <div class="p-4 pt-0 overflow-x-auto">
+      <table class="w-full text-xs text-stone-300">
+        <thead><tr class="text-stone-500 border-b border-stone-700">
+          <th class="py-2 text-left">組み合わせ</th>
+          <th class="py-2 text-left">神託名</th>
+          <th class="py-2 text-left">神</th>
+        </tr></thead>
+        <tbody id="combo-table"></tbody>
+      </table>
+    </div>
+  </details>
+
+  <!-- 履歴 -->
+  <div class="bg-stone-800 rounded-xl p-4">
+    <div class="flex justify-between items-center mb-3">
+      <h2 class="text-sm font-semibold text-stone-400">神託履歴</h2>
+      <button onclick="clearHistory()" aria-label="履歴消去" class="text-xs text-stone-600 hover:text-stone-400">消去</button>
+    </div>
+    <div id="history-list" class="space-y-2 max-h-48 overflow-y-auto"></div>
+  </div>
+</div>
+
+<script>
+// 距骨4面: 1=凸(Chios), 3=平(Planus), 4=凹(Cous), 6=狭(Coius)
+const FACES = [1, 3, 4, 6];
+const FACE_LABELS = { 1: '凸(1)', 3: '平(3)', 4: '凹(4)', 6: '狭(6)' };
+const FACE_EMOJI = { 1: '⬛', 3: '▬', 4: '⚁', 6: '◾' };
+
+// 21通りの組み合わせ（距骨2個: 順不同）
+const ORACLES = {
+  '1-1': { title: 'ヘルメスの速翼', deity: 'ヘルメス', text: '使者の神が喜んでいます。伝達・旅・商取引に最高の吉兆。迅速に行動すれば成功は確実です。意志疎通を大切にしてください。' },
+  '1-3': { title: 'アポロンの竪琴', deity: 'アポロン', text: '光明の神の音楽が響いています。芸術・治癒・予言において吉。真実を語れば、あなたの声は多くの人の心を動かすでしょう。' },
+  '1-4': { title: '二つの道の分岐', deity: 'ヘカテー', text: '三叉路の女神が試しています。重要な選択の時が迫っています。月明かりの下で瞑想し、直感に従いなさい。どちらの道も歩けるのはあなただけです。' },
+  '1-6': { title: 'ゼウスの雷霆', deity: 'ゼウス', text: '天の父神の力が働いています。権威・正義・秩序において最大の加護を受けます。大きな計画を進める最善の時です。' },
+  '3-3': { title: 'デメテルの豊穣', deity: 'デメテル', text: '大地の女神が祝福しています。農業・家族・豊かさに吉。種を蒔く時が今です。忍耐強く世話をすれば、豊かな収穫が訪れます。' },
+  '3-4': { title: '海の霧の中で', deity: 'ポセイドン', text: '海神の気分が揺れています。旅や新事業は不安定な時。嵐が過ぎるまで船を港に留めておきなさい。急ぐ必要はありません。' },
+  '3-6': { title: 'アテナの知恵の盾', deity: 'アテナ', text: '知恵の女神が守護しています。学問・戦略・技芸において優れた成果が期待できます。理性的な判断を下せば、困難も乗り越えられます。' },
+  '4-4': { title: '冥界の警告', deity: 'ハデス', text: '冥界の王が眺めています。現在の道には見えない危険が潜んでいます。軽率な行動を慎み、まず既存の問題を解決することに集中しなさい。' },
+  '4-6': { title: 'アレスの炎', deity: 'アレス', text: '戦の神が燃えています。競争・挑戦・勇気が求められる局面です。勇敢に立ち向かえば道は開けますが、無謀な戦いは避けるべきです。' },
+  '6-6': { title: 'アフロディテの薔薇', deity: 'アフロディテ', text: '愛と美の女神が最高の祝福を贈っています。恋愛・芸術・美・調和において最大の吉兆。今求めているものは既に手の届くところにあります。心を開きなさい。' },
+  '1-1-dup': { title: '', deity: '', text: '' }, // placeholder
+};
+
+// 完全な21エントリ（4面×2個）
+const ALL_COMBOS = [];
+for (let i = 0; i < FACES.length; i++) {
+  for (let j = i; j < FACES.length; j++) {
+    const key = FACES[i] + '-' + FACES[j];
+    ALL_COMBOS.push({ f1: FACES[i], f2: FACES[j], key });
+  }
+}
+
+// 神託辞書補完（21通り）
+const FULL_ORACLES = {
+  '1-1': { title: 'ヘルメスの二重の速翼', deity: 'ヘルメス', text: '最高の吉兆。使者の神の完全な加護のもと、あらゆる取引・旅・伝達が成功します。今すぐ動いてください。神々があなたの背中を押しています。' },
+  '1-3': { title: 'アポロンの弓と竪琴', deity: 'アポロン', text: '予言と音楽の神の示す道は明確です。真実を直言し、才能を惜しみなく使ってください。名声と成功が待っています。' },
+  '1-4': { title: 'ヘカテーの三叉路', deity: 'ヘカテー', text: '重大な選択の岐路に立っています。月明かりに照らされた道を選びなさい。直感こそが最良の羅針盤です。' },
+  '1-6': { title: 'ゼウスの鷹の目', deity: 'ゼウス', text: '天の父神が全てを見通しています。正義と誠実さをもって行動すれば、最高の結果が約束されます。' },
+  '3-3': { title: 'デメテルの二つの穂', deity: 'デメテル', text: '豊穣と家族の神の二重の加護。農業・育児・家庭に関することは大吉。種まきの時を逃さないように。' },
+  '3-4': { title: 'ポセイドンの波', deity: 'ポセイドン', text: '海の神の気まぐれな波に乗っています。今は流れに身を任せ、無理に抗わないことが賢明です。' },
+  '3-6': { title: 'アテナの知恵の盾', deity: 'アテナ', text: '智慧と戦略の女神の盾があなたを守っています。冷静な判断と丁寧な準備で、どんな困難も乗り越えられます。' },
+  '4-4': { title: 'ハデスの二重の扉', deity: 'ハデス', text: '要注意。冥界の王の二重の警告です。大きな決断や新しい冒険は延期し、身を守ることを優先してください。' },
+  '4-6': { title: 'アレスの炎の剣', deity: 'アレス', text: '戦の神が剣を振り上げています。勇敢に立ち向かう時です。ただし感情的にならず、戦略的に動くことが勝利の鍵です。' },
+  '6-6': { title: 'アフロディテの黄金の薔薇', deity: 'アフロディテ', text: '最高の祝福。愛・美・調和・喜びが溢れています。心から望んでいることは実現します。今この瞬間を大切にしてください。' },
+  '1-4': { title: 'ヘカテーの三叉路', deity: 'ヘカテー', text: '三叉路に立っています。正しい道を選ぶために、夜の静けさの中で答えを探しなさい。内なる知恵が導いてくれます。' },
+};
+
+// 全21通りを埋める
+const COMBO_DATA = [
+  { key: '1-1', title: 'ヘルメスの二重速翼', deity: 'ヘルメス', text: '使者の神の完全な加護。取引・旅・伝達すべてに最高吉兆。今すぐ行動してください。' },
+  { key: '1-3', title: 'アポロンの予言', deity: 'アポロン', text: '光と予言の神が示す道。真実を直言し才能を発揮すれば名声と成功が訪れます。' },
+  { key: '1-4', title: 'ヘカテーの岐路', deity: 'ヘカテー', text: '三叉路に立っています。月明かりと直感に従い正しい道を選んでください。' },
+  { key: '1-6', title: 'ゼウスの鷹', deity: 'ゼウス', text: '天父神があなたを見守っています。正義と誠実さで行動すれば最高の結果が約束されます。' },
+  { key: '3-3', title: 'デメテルの二穂', deity: 'デメテル', text: '豊穣の女神の二重加護。家族・育成・農業に大吉。種まきの時を逃さずに。' },
+  { key: '3-4', title: 'ポセイドンの波', deity: 'ポセイドン', text: '海神の気まぐれな波。流れに身を任せ、無理に抗わないことが賢明です。' },
+  { key: '3-6', title: 'アテナの盾', deity: 'アテナ', text: '知恵の女神の盾があなたを守っています。冷静と準備でいかなる困難も克服できます。' },
+  { key: '4-4', title: 'ハデスの二扉', deity: 'ハデス', text: '冥界王の二重警告。大きな決断や新冒険は延期し、身を守ることを優先してください。' },
+  { key: '4-6', title: 'アレスの剣', deity: 'アレス', text: '戦の神が剣を振り上げています。戦略的に勇敢に立ち向かう時。感情的行動は避けて。' },
+  { key: '6-6', title: 'アフロディテの薔薇', deity: 'アフロディテ', text: '最高祝福。愛・美・調和・喜びが溢れています。心から望むことは実現します。' },
+  { key: '1-3', title: 'アポロンの竪琴', deity: 'アポロン', text: '芸術と予言において吉。真実を語れば多くの心を動かします。' }, // dup handled
+  { key: '3-1', title: 'アポロンの竪琴', deity: 'アポロン', text: '芸術と予言において吉。真実を語れば多くの心を動かします。' },
+];
+
+const ORACLE_MAP = {};
+COMBO_DATA.forEach(c => { if (!ORACLE_MAP[c.key]) ORACLE_MAP[c.key] = c; });
+
+// Generate full 21 combos
+const FULL_21 = [];
+for (let i = 0; i < FACES.length; i++) {
+  for (let j = i; j < FACES.length; j++) {
+    const k = FACES[i] + '-' + FACES[j];
+    FULL_21.push({ f1: FACES[i], f2: FACES[j], key: k, oracle: ORACLE_MAP[k] || { title: k, deity: '諸神', text: '神託は沈黙しています。再び骨を投げてください。' } });
+  }
+}
+
+let history = [];
+
+function loadState() {
+  try { const s = localStorage.getItem('astragalomancy'); if (s) { const d = JSON.parse(s); history = d.history || []; } } catch(e) {}
+}
+function saveState() { localStorage.setItem('astragalomancy', JSON.stringify({ history })); }
+
+function rollAstragalos() {
+  return FACES[Math.floor(Math.random() * 4)];
+}
+
+function faceEmoji(v) {
+  const map = { 1: '⬛', 3: '▬', 4: '◼', 6: '▪' };
+  return map[v] || '?';
+}
+
+function castBones() {
+  const q = document.getElementById('question').value.trim();
+  const b1 = rollAstragalos();
+  const b2 = rollAstragalos();
+  const low = Math.min(b1, b2);
+  const high = Math.max(b1, b2);
+  const key = low + '-' + high;
+  const oracle = ORACLE_MAP[key] || { title: '神託: ' + key, deity: '諸神', text: '骨が語りかけています。静かに耳を傾けてください。' };
+
+  document.getElementById('bones-display').classList.remove('hidden');
+  document.getElementById('bone1-face').textContent = faceEmoji(b1);
+  document.getElementById('bone1-val').textContent = FACE_LABELS[b1];
+  document.getElementById('bone2-face').textContent = faceEmoji(b2);
+  document.getElementById('bone2-val').textContent = FACE_LABELS[b2];
+  document.getElementById('combo-label').textContent = `組み合わせ: ${b1} + ${b2} = ${key}`;
+
+  document.getElementById('oracle-display').classList.remove('hidden');
+  document.getElementById('oracle-title').textContent = oracle.title;
+  document.getElementById('oracle-text').textContent = oracle.text;
+  document.getElementById('oracle-deity').textContent = `守護神: ${oracle.deity}`;
+
+  history.unshift({
+    date: new Date().toLocaleString('ja-JP'),
+    question: q || '（質問なし）',
+    b1, b2, key,
+    title: oracle.title,
+  });
+  if (history.length > 15) history.pop();
+  saveState();
+  renderHistory();
+}
+
+function renderHistory() {
+  const c = document.getElementById('history-list');
+  c.innerHTML = '';
+  if (history.length === 0) {
+    const p = document.createElement('p');
+    p.className = 'text-stone-600 text-sm';
+    p.textContent = '履歴なし';
+    c.appendChild(p);
+    return;
+  }
+  history.forEach(h => {
+    const row = document.createElement('div');
+    row.className = 'bg-stone-700 rounded-lg p-2 text-xs';
+    const line1 = document.createElement('div');
+    line1.className = 'flex justify-between text-stone-400 mb-1';
+    const dateSpan = document.createElement('span');
+    dateSpan.textContent = h.date;
+    line1.appendChild(dateSpan);
+    const line2 = document.createElement('div');
+    line2.className = 'text-stone-200';
+    line2.textContent = `${faceEmoji(h.b1)}(${h.b1}) + ${faceEmoji(h.b2)}(${h.b2}) → 【${h.title}】`;
+    const line3 = document.createElement('div');
+    line3.className = 'text-stone-400';
+    line3.textContent = h.question.length > 50 ? h.question.slice(0,50)+'...' : h.question;
+    row.appendChild(line1);
+    row.appendChild(line2);
+    row.appendChild(line3);
+    c.appendChild(row);
+  });
+}
+
+function renderComboTable() {
+  const tbody = document.getElementById('combo-table');
+  tbody.innerHTML = '';
+  FULL_21.forEach(c => {
+    const tr = document.createElement('tr');
+    tr.className = 'border-b border-stone-700';
+    const td1 = document.createElement('td');
+    td1.className = 'py-1 font-mono';
+    td1.textContent = c.f1 + ' + ' + c.f2;
+    const td2 = document.createElement('td');
+    td2.className = 'py-1';
+    td2.textContent = c.oracle.title;
+    const td3 = document.createElement('td');
+    td3.className = 'py-1 text-stone-400';
+    td3.textContent = c.oracle.deity;
+    tr.appendChild(td1); tr.appendChild(td2); tr.appendChild(td3);
+    tbody.appendChild(tr);
+  });
+}
+
+function clearHistory() {
+  if (!confirm('履歴を消去しますか？')) return;
+  history = [];
+  saveState();
+  renderHistory();
+}
+
+loadState();
+renderHistory();
+renderComboTable();
+</script>
+</body>
+</html>
